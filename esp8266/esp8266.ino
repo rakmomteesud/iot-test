@@ -15,12 +15,13 @@
 
 //wifi setup
 #ifndef STASSID
-#define STASSID "" //set ssid
-#define STAPSK  ""  //set password
+#define STASSID "ssid" //set ssid
+#define STAPSK  "password"  //set password
 #endif
 
 //bme680
 #define IIC_ADDR  uint8_t(0x76)
+
 //bme680
 Seeed_BME680 bme680(IIC_ADDR); /* IIC PROTOCOL */
 
@@ -32,24 +33,32 @@ Seeed_BME680 bme680(IIC_ADDR); /* IIC PROTOCOL */
 #endif
 
 //setup sensor name
-String device_name = ""; // set device name
-String sensor_type1 = ""; // set sensor1 name
-String sensor_type2 = ""; // set sensor2 name
+String device_name = "yourdevicename"; // set device name
+String sensor_type1 = "bme680"; // set sensor1 name
+String sensor_type2 = "hm3301"; // set sensor2 name
+
+//httpclient
+String svdetail = "http://hostname:8086/write?db=dbname&u=username&p=password&precision=s";  // set host && user && pw db
+
 //wifi
 const char* ssid = STASSID;
 const char* password = STAPSK;
+String ipStr = "";
+String macStr = "";
+String rssiStr = "";
+
 //led
 const int ESP_BUILTIN_LED = 2; //led
+
 //webupdater
-const char* host = "host";
+const char* host = "hostname";
 const char* update_path = "/firmware";
 const char* update_username = "admin";
 String update_password = "admin" + device_name;
+
 //webupdater
 ESP8266WebServer httpServer(8080);
 ESP8266HTTPUpdateServer httpUpdater;
-//httpclient
-String svdetail = "http://host:8086/write?db=db&u=u&p=p&precision=s";  // set host && user && pw db
 
 //start hm3301
 HM330X sensor;
@@ -121,24 +130,26 @@ void setup() {
   //wifi
   SERIAL_OUTPUT.print("\n");
   SERIAL_OUTPUT.println("Attempting to connect to network...");
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) { 
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     delay(5000);
     SERIAL_OUTPUT.print("Couldn't get a WiFi connection");
     ESP.restart();
   }
   SERIAL_OUTPUT.println("Connected to network");
 
-  // print your WiFi shield's IP address:
-  //IPAddress ip = WiFi.localIP();
+  IPAddress myIP = WiFi.localIP();
+  ipStr = String(myIP[0]) + "." + String(myIP[1]) + "." + String(myIP[2]) + "." + String(myIP[3]);
+  macStr = String(WiFi.macAddress());
+  rssiStr = String(WiFi.RSSI());
+  
   SERIAL_OUTPUT.print("IP Address: ");
-  SERIAL_OUTPUT.println(WiFi.localIP()) + "\n";
+  SERIAL_OUTPUT.println(ipStr) + "\n";
   SERIAL_OUTPUT.print("Mac Address: ");
-  SERIAL_OUTPUT.println(WiFi.macAddress()) + "\n";
+  SERIAL_OUTPUT.println(macStr) + "\n";
 
-  // print the received signal strength:
   long rssi = WiFi.RSSI();
   SERIAL_OUTPUT.print("Signal Strength (RSSI):");
-  SERIAL_OUTPUT.print(rssi);
+  SERIAL_OUTPUT.print(rssiStr);
   SERIAL_OUTPUT.println(" dBm\n");
 
   //webupdater
@@ -174,7 +185,7 @@ void loop() {
       HTTPClient http;
       http.begin(svdetail);
       http.addHeader("Content-Type", "--data-binary");
-      String postData = sensor_type1 + ",devicename=" + device_name + " temperature=" + t + ",pressure=" + p + ",humidity=" + h + ",gas=" + g;
+      String postData = sensor_type1 + ",devicename=" + device_name + ",ip=" + ipStr +",mac=" + macStr +",rssi=" + rssiStr + " temperature=" + t + ",pressure=" + p + ",humidity=" + h + ",gas=" + g;
       int httpCode = http.POST(postData);
       SERIAL_OUTPUT.print(httpCode);
       SERIAL_OUTPUT.print(" : ");
@@ -196,7 +207,7 @@ void loop() {
       HTTPClient http;
       http.begin(svdetail);
       http.addHeader("Content-Type", "--data-binary");
-      String postData2 = sensor_type2 + ",devicename=" + device_name + " pm1std=" + data_hm[2] + ",pm25std=" + data_hm[3] + ",pm10std=" + data_hm[4] + ",pm1atm=" + data_hm[5] + ",pm25atm=" + data_hm[6] + ",pm10atm=" + data_hm[7];
+      String postData2 = sensor_type2 + ",devicename=" + device_name + ",ip=" + ipStr +",mac=" + macStr +",rssi=" + rssiStr + " pm1std=" + data_hm[2] + ",pm25std=" + data_hm[3] + ",pm10std=" + data_hm[4] + ",pm1atm=" + data_hm[5] + ",pm25atm=" + data_hm[6] + ",pm10atm=" + data_hm[7];
       int httpCode2 = http.POST(postData2);
       SERIAL_OUTPUT.print(httpCode2);
       SERIAL_OUTPUT.print(" : ");
