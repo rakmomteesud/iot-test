@@ -13,11 +13,23 @@
 //hm3301
 #include <Seeed_HM330X.h>
 
-//wifi setup
+//setup wifi
 #ifndef STASSID
-#define STASSID "ssid" //set ssid
-#define STAPSK  "password"  //set password
+#define STASSID "ssid"
+#define STAPSK  "password"  
 #endif
+
+//setup sensor name
+String device_name = "yourdevicename"; 
+String sensor_type1 = "bme680";
+String sensor_type2 = "hm3301"; 
+
+//setup server post data
+String server_ip = "ip";
+String server_port = "port";
+String db_name = "dbname";
+String db_username = "dbuser";
+String db_password = "dbpasswd";
 
 //bme680
 #define IIC_ADDR  uint8_t(0x76)
@@ -32,13 +44,8 @@ Seeed_BME680 bme680(IIC_ADDR); /* IIC PROTOCOL */
 #define SERIAL_OUTPUT Serial
 #endif
 
-//setup sensor name
-String device_name = "yourdevicename"; // set device name
-String sensor_type1 = "bme680"; // set sensor1 name
-String sensor_type2 = "hm3301"; // set sensor2 name
-
 //httpclient
-String svdetail = "http://hostname:8086/write?db=dbname&u=username&p=password&precision=s";  // set host && user && pw db
+String svdetail = "http://" + server_ip + ":" + server_port + "/write?db=" + db_name + "&u=" + db_username + "&p=" + db_password + "&precision=s";  // set host && user && pw db
 
 //wifi
 const char* ssid = STASSID;
@@ -59,6 +66,21 @@ String update_password = "admin" + device_name;
 //webupdater
 ESP8266WebServer httpServer(8080);
 ESP8266HTTPUpdateServer httpUpdater;
+
+void handleNotFound() {
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += httpServer.uri();
+  message += "\nMethod: ";
+  message += (httpServer.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += httpServer.args();
+  message += "\n";
+  for (uint8_t i = 0; i < httpServer.args(); i++) {
+    message += " " + httpServer.argName(i) + ": " + httpServer.arg(i) + "\n";
+  }
+  httpServer.send(404, "text/plain", message);
+}
 
 //start hm3301
 HM330X sensor;
@@ -128,7 +150,7 @@ void setup() {
   WiFi.begin(ssid, password); //WiFi connection
 
   //wifi
-  SERIAL_OUTPUT.print("\n");
+  SERIAL_OUTPUT.println('\n');
   SERIAL_OUTPUT.println("Attempting to connect to network...");
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     delay(5000);
@@ -141,7 +163,7 @@ void setup() {
   ipStr = String(myIP[0]) + "." + String(myIP[1]) + "." + String(myIP[2]) + "." + String(myIP[3]);
   macStr = String(WiFi.macAddress());
   rssiStr = String(WiFi.RSSI());
-  
+
   SERIAL_OUTPUT.print("IP Address: ");
   SERIAL_OUTPUT.println(ipStr) + "\n";
   SERIAL_OUTPUT.print("Mac Address: ");
@@ -154,6 +176,33 @@ void setup() {
 
   //webupdater
   MDNS.begin(host);
+  
+  httpServer.on("/info", []() {
+    String message = "Device Information\n\n";
+    message += "Hostname: ";
+    message += device_name;
+    message += "\nSSID: ";
+    message += ssid;
+    message += "\nIP Address: ";
+    message += ipStr;
+    message += "\nMac Address: ";
+    message += macStr;
+    message += "\nRSSI: ";
+    message += rssiStr;
+    message += "\n\nDatabase Config\n\n";
+    message += "IP: ";
+    message += server_ip.substring(12);
+    message += "\nPort: ";
+    message += server_port.substring(1, 3);
+    message += "\nDatabase Name: ";
+    message += db_name.substring(0, 2);
+    message += "\nUsername: ";
+    message += db_username.substring(1, 3);
+    message += "\n";
+    httpServer.send(200, "text/plain", message);
+  });
+  
+  httpServer.onNotFound(handleNotFound);
   httpUpdater.setup(&httpServer, update_path, update_username, update_password);
   httpServer.begin();
   MDNS.addService("http", "tcp", 8080);
@@ -185,7 +234,7 @@ void loop() {
       HTTPClient http;
       http.begin(svdetail);
       http.addHeader("Content-Type", "--data-binary");
-      String postData = sensor_type1 + ",devicename=" + device_name + ",ip=" + ipStr +",mac=" + macStr +",rssi=" + rssiStr + " temperature=" + t + ",pressure=" + p + ",humidity=" + h + ",gas=" + g;
+      String postData = sensor_type1 + ",devicename=" + device_name + ",ip=" + ipStr + ",mac=" + macStr + ",rssi=" + rssiStr + " temperature=" + t + ",pressure=" + p + ",humidity=" + h + ",gas=" + g;
       int httpCode = http.POST(postData);
       SERIAL_OUTPUT.print(httpCode);
       SERIAL_OUTPUT.print(" : ");
@@ -207,7 +256,7 @@ void loop() {
       HTTPClient http;
       http.begin(svdetail);
       http.addHeader("Content-Type", "--data-binary");
-      String postData2 = sensor_type2 + ",devicename=" + device_name + ",ip=" + ipStr +",mac=" + macStr +",rssi=" + rssiStr + " pm1std=" + data_hm[2] + ",pm25std=" + data_hm[3] + ",pm10std=" + data_hm[4] + ",pm1atm=" + data_hm[5] + ",pm25atm=" + data_hm[6] + ",pm10atm=" + data_hm[7];
+      String postData2 = sensor_type2 + ",devicename=" + device_name + ",ip=" + ipStr + ",mac=" + macStr + ",rssi=" + rssiStr + " pm1std=" + data_hm[2] + ",pm25std=" + data_hm[3] + ",pm10std=" + data_hm[4] + ",pm1atm=" + data_hm[5] + ",pm25atm=" + data_hm[6] + ",pm10atm=" + data_hm[7];
       int httpCode2 = http.POST(postData2);
       SERIAL_OUTPUT.print(httpCode2);
       SERIAL_OUTPUT.print(" : ");
